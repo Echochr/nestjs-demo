@@ -5,6 +5,7 @@ import * as pactum from 'pactum';
 import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { UserDto } from '../src/auth/dto';
+import { UpdateUserDto } from '../src/user/dto';
 
 describe('AppModule e2e', () => {
   let app: INestApplication;
@@ -144,6 +145,7 @@ describe('AppModule e2e', () => {
           .post('/auth/signin')
           .withBody(dto)
           .expectStatus(HttpStatus.OK)
+          .expectBodyContains('access_token')
           .stores('userAt', 'access_token');
       });
     });
@@ -151,11 +153,37 @@ describe('AppModule e2e', () => {
 
   describe('User', () => {
     describe('Get current user profile', () => {
-      it.todo('should get current user profile');
+      it('should throw an UnauthorizedException if no valid Bearer token is provided', () => {
+        return pactum
+          .spec()
+          .get('/users/profile')
+          .expectStatus(HttpStatus.UNAUTHORIZED);
+      });
+
+      it('should return the current user profile', () => {
+        return pactum
+          .spec()
+          .get('/users/profile')
+          .withHeaders({ Authorization: 'Bearer $S{userAt}' })
+          .expectStatus(HttpStatus.OK);
+      });
     });
 
     describe('Update user', () => {
-      it.todo('should update user');
+      it('should update user', () => {
+        const dto: UpdateUserDto = {
+          firstName: 'John',
+          email: 'john.doe.updated@gmail.com',
+        };
+        return pactum
+          .spec()
+          .put('/users')
+          .withHeaders({ Authorization: 'Bearer $S{userAt}' })
+          .withBody(dto)
+          .expectStatus(HttpStatus.OK)
+          .expectBodyContains(dto.firstName)
+          .expectBodyContains(dto.email);
+      });
     });
   });
 
