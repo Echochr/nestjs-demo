@@ -6,6 +6,7 @@ import { AppModule } from '../src/app.module';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { UserDto } from '../src/auth/dto';
 import { UpdateUserDto } from '../src/user/dto';
+import { CreateBookmarkDto, UpdateBookmarkDto } from '../src/bookmark/dto';
 
 describe('AppModule e2e', () => {
   let app: INestApplication;
@@ -51,7 +52,8 @@ describe('AppModule e2e', () => {
             email: 'john.doe',
             password: dto.password,
           })
-          .expectStatus(HttpStatus.BAD_REQUEST);
+          .expectStatus(HttpStatus.BAD_REQUEST)
+          .expectBodyContains('email must be an email');
       });
 
       it('should throw a BadRequestException if password is invalid', () => {
@@ -62,14 +64,17 @@ describe('AppModule e2e', () => {
             email: dto.email,
             password: 123, // both email and password expect a string
           })
-          .expectStatus(HttpStatus.BAD_REQUEST);
+          .expectStatus(HttpStatus.BAD_REQUEST)
+          .expectBodyContains('password must be a string');
       });
 
       it('should throw a BadRequestException if no dto provided', () => {
         return pactum
           .spec()
           .post('/auth/signup')
-          .expectStatus(HttpStatus.BAD_REQUEST);
+          .expectStatus(HttpStatus.BAD_REQUEST)
+          .expectBodyContains('email should not be empty')
+          .expectBodyContains('password should not be empty');
       });
 
       it('should sign up', () => {
@@ -85,7 +90,8 @@ describe('AppModule e2e', () => {
           .spec()
           .post('/auth/signup')
           .withBody(dto)
-          .expectStatus(HttpStatus.BAD_REQUEST);
+          .expectStatus(HttpStatus.BAD_REQUEST)
+          .expectBodyContains('Email has already been taken');
       });
     });
 
@@ -97,7 +103,8 @@ describe('AppModule e2e', () => {
           .withBody({
             password: dto.password,
           })
-          .expectStatus(HttpStatus.BAD_REQUEST);
+          .expectStatus(HttpStatus.BAD_REQUEST)
+          .expectBodyContains('email should not be empty');
       });
 
       it('should throw a BadRequestException if password is empty', () => {
@@ -107,14 +114,17 @@ describe('AppModule e2e', () => {
           .withBody({
             email: dto.email,
           })
-          .expectStatus(HttpStatus.BAD_REQUEST);
+          .expectStatus(HttpStatus.BAD_REQUEST)
+          .expectBodyContains('password should not be empty');
       });
 
       it('should throw a BadRequestException if no dto provided', () => {
         return pactum
           .spec()
           .post('/auth/signin')
-          .expectStatus(HttpStatus.BAD_REQUEST);
+          .expectStatus(HttpStatus.BAD_REQUEST)
+          .expectBodyContains('email should not be empty')
+          .expectBodyContains('password should not be empty');
       });
 
       it('should throw a NotFoundException if no user is found', () => {
@@ -125,7 +135,8 @@ describe('AppModule e2e', () => {
             email: 'usernotexist@gmail.com',
             password: dto.password,
           })
-          .expectStatus(HttpStatus.NOT_FOUND);
+          .expectStatus(HttpStatus.NOT_FOUND)
+          .expectBodyContains('User not found');
       });
 
       it('should throw an UnauthorizedException if password is incorrect', () => {
@@ -136,7 +147,8 @@ describe('AppModule e2e', () => {
             email: dto.email,
             password: 'incorrect_password',
           })
-          .expectStatus(HttpStatus.UNAUTHORIZED);
+          .expectStatus(HttpStatus.UNAUTHORIZED)
+          .expectBodyContains('Password incorrect');
       });
 
       it('should sign in', () => {
@@ -188,20 +200,122 @@ describe('AppModule e2e', () => {
   });
 
   describe('Bookmarks', () => {
+    describe('Get empty bookmarks', () => {
+      it('should return an empty array of bookmarks initially', () => {
+        return pactum
+          .spec()
+          .get('/bookmarks')
+          .withHeaders({ Authorization: 'Bearer $S{userAt}' })
+          .expectStatus(HttpStatus.OK)
+          .expectBody([]);
+      });
+    });
+
     describe('Create bookmark', () => {
-      it.todo('should create bookmark');
+      const dto: CreateBookmarkDto = {
+        title: 'First Bookmark',
+        link: 'https://google.com',
+      };
+
+      it('should create a bookmark', () => {
+        return pactum
+          .spec()
+          .post('/bookmarks')
+          .withHeaders({ Authorization: 'Bearer $S{userAt}' })
+          .withBody(dto)
+          .expectStatus(HttpStatus.CREATED)
+          .stores('bookmarkId', 'id');
+      });
     });
+
     describe('Get all bookmarks', () => {
-      it.todo('should get all bookmarks');
+      it('should get all bookmarks', () => {
+        return pactum
+          .spec()
+          .get('/bookmarks')
+          .withHeaders({ Authorization: 'Bearer $S{userAt}' })
+          .expectStatus(HttpStatus.OK)
+          .expectJsonLength(1);
+      });
     });
+
     describe('Get bookmark by id', () => {
-      it.todo('should get bookmark by id');
+      it('should get bookmark by id', () => {
+        return pactum
+          .spec()
+          .get('/bookmarks/{id}')
+          .withHeaders({ Authorization: 'Bearer $S{userAt}' })
+          .withPathParams('id', '$S{bookmarkId}')
+          .expectStatus(HttpStatus.OK)
+          .expectBodyContains('$S{bookmarkId}');
+      });
     });
     describe('Update bookmark by id', () => {
-      it.todo('should update bookmark by id');
+      const dto: UpdateBookmarkDto = {
+        title: 'Google.com',
+        description: 'Google.com. The most popular search engine',
+      };
+
+      it('should throw a NotFoundException if no bookmark is found', () => {
+        return pactum
+          .spec()
+          .put('/bookmarks/{id}')
+          .withHeaders({ Authorization: 'Bearer $S{userAt}' })
+          .withPathParams('id', '9999')
+          .withBody(dto)
+          .expectStatus(HttpStatus.NOT_FOUND)
+          .expectBodyContains('Bookmark not found');
+      });
+
+      it.todo(
+        'should throw a ForbiddenException if current user does not own the bookmark',
+      );
+
+      it('should update bookmark by id', () => {
+        return pactum
+          .spec()
+          .put('/bookmarks/{id}')
+          .withHeaders({ Authorization: 'Bearer $S{userAt}' })
+          .withPathParams('id', '$S{bookmarkId}')
+          .withBody(dto)
+          .expectStatus(HttpStatus.OK)
+          .expectBodyContains(dto.title)
+          .expectBodyContains(dto.description);
+      });
     });
+
     describe('Delete bookmark by id', () => {
-      it.todo('should delete bookmark by id');
+      it('should throw a NotFoundException if no bookmark is found', () => {
+        return pactum
+          .spec()
+          .put('/bookmarks/{id}')
+          .withHeaders({ Authorization: 'Bearer $S{userAt}' })
+          .withPathParams('id', '9999')
+          .expectStatus(HttpStatus.NOT_FOUND)
+          .expectBodyContains('Bookmark not found');
+      });
+
+      it.todo(
+        'should throw a ForbiddenException if current user does not own the bookmark',
+      );
+
+      it('should delete bookmark by id', () => {
+        return pactum
+          .spec()
+          .delete('/bookmarks/{id}')
+          .withHeaders({ Authorization: 'Bearer $S{userAt}' })
+          .withPathParams('id', '$S{bookmarkId}')
+          .expectStatus(HttpStatus.NO_CONTENT);
+      });
+
+      it('should return an empty array of bookmarks finally', () => {
+        return pactum
+          .spec()
+          .get('/bookmarks')
+          .withHeaders({ Authorization: 'Bearer $S{userAt}' })
+          .expectStatus(HttpStatus.OK)
+          .expectBody([]);
+      });
     });
   });
 });
